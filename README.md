@@ -75,3 +75,44 @@ Your work will be automatically submitted when you push to your GitHub Classroom
 - [React Documentation](https://react.dev/)
 - [Express.js Documentation](https://expressjs.com/)
 - [Building a Chat Application with Socket.io](https://socket.io/get-started/chat) 
+
+## Setup
+
+1. Requirements: Node.js v18+
+2. Install dependencies:
+   - Server
+     ```
+     cd server
+     npm install
+     npm run dev
+     ```
+   - Client
+     ```
+     cd ../client
+     npm install
+     npm run dev
+     ```
+3. Environment:
+   - Client uses `VITE_SOCKET_URL` (defaults to `http://localhost:5000`).
+   - Server uses `CLIENT_URL` (defaults to `http://localhost:5173`).
+
+## Features Implemented
+
+- Real-time global chat with Socket.io
+- Presence: online/offline and user list
+- Typing indicators
+- Direct messages (private messaging)
+- Read receipts (basic: emits on receive/visible)
+- Browser notifications for new messages when tab unfocused
+- Rooms API (join/leave/send) with basic history per room
+
+## How to Use
+
+1. Open client at `http://localhost:5173`, choose a username.
+2. Chat in the global room or select a user from the sidebar to send a DM.
+3. Typing indicator shows who is typing; unread/read events are emitted automatically.
+4. Optional: implement a small UI to join a room via `joinRoom(room)` from the socket hook.
+
+## Notes
+
+- This is a learning-oriented implementation. Production apps should persist users/messages and secure auth (JWT/OAuth). Read receipts typically attach per-user state server-side and only dispatch when message is actually seen.

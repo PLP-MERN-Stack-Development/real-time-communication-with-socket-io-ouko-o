@@ -29,6 +29,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Store connected users and messages
 const users = {};
 const messages = [];
+const roomMessages = {}; // roomName -> array of messages
 const typingUsers = {};
 
 // Socket.io connection handler
@@ -91,6 +92,41 @@ io.on('connection', (socket) => {
     
     socket.to(to).emit('private_message', messageData);
     socket.emit('private_message', messageData);
+  });
+
+  // Handle rooms join/leave
+  socket.on('join_room', (roomName) => {
+    socket.join(roomName);
+    socket.to(roomName).emit('user_joined', { username: users[socket.id]?.username || 'Anonymous', id: socket.id, room: roomName });
+    if (!roomMessages[roomName]) roomMessages[roomName] = [];
+    socket.emit('room_history', { room: roomName, messages: roomMessages[roomName] });
+  });
+
+  socket.on('leave_room', (roomName) => {
+    socket.leave(roomName);
+    socket.to(roomName).emit('user_left', { username: users[socket.id]?.username || 'Anonymous', id: socket.id, room: roomName });
+  });
+
+  // Room message
+  socket.on('room_message', ({ room, message }) => {
+    if (!room) return;
+    const messageData = {
+      id: Date.now(),
+      sender: users[socket.id]?.username || 'Anonymous',
+      senderId: socket.id,
+      message,
+      timestamp: new Date().toISOString(),
+      room,
+    };
+    if (!roomMessages[room]) roomMessages[room] = [];
+    roomMessages[room].push(messageData);
+    if (roomMessages[room].length > 100) roomMessages[room].shift();
+    io.to(room).emit('room_message', messageData);
+  });
+
+  // Read receipts
+  socket.on('message_read', ({ messageId }) => {
+    io.emit('message_read', { messageId, readerId: socket.id });
   });
 
   // Handle disconnection

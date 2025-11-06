@@ -21,6 +21,8 @@ export const useSocket = () => {
   const [messages, setMessages] = useState([]);
   const [users, setUsers] = useState([]);
   const [typingUsers, setTypingUsers] = useState([]);
+  const [readReceipts, setReadReceipts] = useState({}); // messageId -> Set of readerIds
+  const [roomMessages, setRoomMessages] = useState({}); // room -> messages array
 
   // Connect to socket server
   const connect = (username) => {
@@ -50,6 +52,11 @@ export const useSocket = () => {
     socket.emit('typing', isTyping);
   };
 
+  // Rooms helpers
+  const joinRoom = (room) => socket.emit('join_room', room);
+  const leaveRoom = (room) => socket.emit('leave_room', room);
+  const sendRoomMessage = (room, message) => socket.emit('room_message', { room, message });
+
   // Socket event listeners
   useEffect(() => {
     // Connection events
@@ -65,11 +72,16 @@ export const useSocket = () => {
     const onReceiveMessage = (message) => {
       setLastMessage(message);
       setMessages((prev) => [...prev, message]);
+      // immediately acknowledge as read (for demo), in real apps only when visible
+      if (!message.system) {
+        socket.emit('message_read', { messageId: message.id });
+      }
     };
 
     const onPrivateMessage = (message) => {
       setLastMessage(message);
       setMessages((prev) => [...prev, message]);
+      socket.emit('message_read', { messageId: message.id });
     };
 
     // User events
@@ -108,6 +120,26 @@ export const useSocket = () => {
       setTypingUsers(users);
     };
 
+    // Room events
+    const onRoomMessage = (message) => {
+      setRoomMessages((prev) => {
+        const existing = prev[message.room] || [];
+        return { ...prev, [message.room]: [...existing, message] };
+      });
+    };
+
+    const onRoomHistory = ({ room, messages }) => {
+      setRoomMessages((prev) => ({ ...prev, [room]: messages }));
+    };
+
+    const onMessageRead = ({ messageId, readerId }) => {
+      setReadReceipts((prev) => {
+        const existing = new Set(prev[messageId] || []);
+        existing.add(readerId);
+        return { ...prev, [messageId]: Array.from(existing) };
+      });
+    };
+
     // Register event listeners
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
@@ -117,6 +149,9 @@ export const useSocket = () => {
     socket.on('user_joined', onUserJoined);
     socket.on('user_left', onUserLeft);
     socket.on('typing_users', onTypingUsers);
+    socket.on('message_read', onMessageRead);
+    socket.on('room_message', onRoomMessage);
+    socket.on('room_history', onRoomHistory);
 
     // Clean up event listeners
     return () => {
@@ -128,6 +163,9 @@ export const useSocket = () => {
       socket.off('user_joined', onUserJoined);
       socket.off('user_left', onUserLeft);
       socket.off('typing_users', onTypingUsers);
+      socket.off('message_read', onMessageRead);
+      socket.off('room_message', onRoomMessage);
+      socket.off('room_history', onRoomHistory);
     };
   }, []);
 
@@ -138,11 +176,16 @@ export const useSocket = () => {
     messages,
     users,
     typingUsers,
+    readReceipts,
+    roomMessages,
     connect,
     disconnect,
     sendMessage,
     sendPrivateMessage,
     setTyping,
+    joinRoom,
+    leaveRoom,
+    sendRoomMessage,
   };
 };
 
